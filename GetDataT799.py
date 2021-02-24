@@ -62,6 +62,7 @@ class CSimulateT799(object):
         self.GetProfData(path, nowdate)
 
     def rttov(self, nchans, channelID, FileCoef,
+              emis=None, brdf=None,
               emispath=None, brdfpath=None):
 
         # 视场匹配
@@ -98,10 +99,21 @@ class CSimulateT799(object):
                               self.year,
                               self.month
                               )
+        if emis is not None :
+            inemis = np.transpose(emis[:, row, col])
+        else:
+            inemis = None
+
+        if brdf is not None :
+            inbrdf= np.full((len(row), nchans), fill_value=-1.0, dtype=np.float32)
+            inbrdf[:, :6] = np.transpose(brdf[:, row, col])
+        else:
+            inbrdf = None
 
         self.myrttov = SimulateIR_clr(nchans, channelID, self.nprofs,
-                       self.NWP_LEVEL, myprof, self.month,
-                       FileCoef, emispath=emispath, brdfpath=brdfpath)
+                       self.NWP_LEVEL, myprof, self.month, FileCoef,
+                       inemis=inemis, inbrdf=inbrdf,
+                       emispath=emispath, brdfpath=brdfpath)
 
         return self.myrttov
 
@@ -301,16 +313,13 @@ class CSimulateT799(object):
 
 
 
-
-
-if __name__ == '__main__':
-
+def run(nwptime, geoname, outname, albedoname=None):
     import time
 
     t1 = time.time()
+    if albedoname is not None :
+        brdf = lb_readnc(albedoname, 'brdf')
 
-    path = '/product/mnt/test/data/20200817'
-    geoname = r'/product/mnt/test/data/FY4A-_AGRI--_N_DISK_1047E_L1-_GEO-_MULT_NOM_20200817040000_20200817041459_4000M_V0001.HDF'
 
     satzen = lb_readnc(geoname, 'NOMSatelliteZenith')
     satazi = lb_readnc(geoname, 'NOMSatelliteAzimuth')
@@ -324,7 +333,7 @@ if __name__ == '__main__':
     year = 2020
     month = 8
     day = 17
-    msimul = CSimulateT799(path,'2020081700.003', 2748, 2748,
+    msimul = CSimulateT799(path,nwptime, 2748, 2748,
                            satzen, satazi, sunzen, sunazi,
                            lat, lon, elev, LandSeaMask, year, month, day)
 
@@ -336,12 +345,31 @@ if __name__ == '__main__':
     nchans = 13
     channels = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
 
-    msimul.rttov(nchans, channels, FileCoef, emispath, brdfpath)
-
+    msimul.rttov(nchans, channels, FileCoef,
+                 brdf=brdf, emispath=emispath, brdfpath=brdfpath)
 
     bt = msimul.GetBT()
 
-    lb_writenc('fy4a_nom_20200817040000_win0.nc', 'bt', bt, dimension=('z', 'y', 'x'), overwrite=1)
+    lb_writenc(outname, 'bt', bt, dimension=('z', 'y', 'x'), overwrite=1)
 
     t2 = time.time()
     print('cost %.2fs' %(t2 - t1))
+    exit()
+
+if __name__ == '__main__':
+    path = '/product/mnt/test/data/20200817'
+
+    import glob
+    import datetime
+    filelist = glob.glob(os.path.join(r'/product/mnt/data/simulate/GEO', '*L1*GEO*.HDF'))
+    filelist.sort()
+    for geoname in filelist :
+        basename = os.path.basename(geoname)
+        namelist = basename.split('_')
+        nowtime = datetime.datetime.strptime(namelist[9], '%Y%m%d%H%M%S')
+        albedoname = r'/product/mnt/data/albedo/fy4a_nom_%s.nc' %(namelist[9])
+
+        hours = nowtime.hour
+        nwptime ='%s%02d.%03d' %('20200817' , int(hours/12) * 12, int(np.mod(hours, 12) / 3) * 3)
+        outname = os.path.join(r'/product/mnt/data/simulate', 'fy4a_nom_brdf_%s.nc' %(nowtime.strftime('%Y%m%d%H%M%S')))
+        run(nwptime, geoname, outname, albedoname)
