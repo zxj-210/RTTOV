@@ -7,7 +7,7 @@ from config import *
 from scipy import interpolate
 
 from ncpro import lb_writenc,lb_readnc
-from rttov_ir_clr_fwd import Initprofiles, SimulateIR_clr
+from rttov_ir_clr_fwd import SimulateIR
 
 
 
@@ -69,36 +69,6 @@ class CSimulateT799(object):
         row, col = self.ViewMatch()
         self.nchans = nchans
 
-        myprof = Initprofiles(self.nprofs, self.NWP_LEVEL,
-                              np.transpose(self.nwp_pre[:, row, col]),
-                              np.transpose(self.nwp_t[:, row, col]),
-                              np.transpose(self.nwp_q[:, row, col]),
-                              self.nwp_t2m[row, col],
-                              self.nwp_q2m[row, col],
-                              self.nwp_ts[row, col],
-                              self.nwp_sp[row, col],
-                              self.nwp_u10m[row, col],
-                              self.nwp_v10m[row, col],
-                              # self.fy4a_nom_p[self.validflag, :],
-                              # self.fy4a_nom_t[self.validflag, :],
-                              # self.fy4a_nom_q[self.validflag, :],
-                              # self.fy4a_nom_t2m[self.validflag],
-                              # self.fy4a_nom_q2m[self.validflag],
-                              # self.fy4a_nom_ts[self.validflag],
-                              # self.fy4a_nom_sp[self.validflag],
-                              # self.fy4a_nom_u10m[self.validflag],
-                              # self.fy4a_nom_v10m[self.validflag],
-                              self.satz[self.validflag],
-                              self.sata[self.validflag],
-                              self.sunz[self.validflag],
-                              self.suna[self.validflag],
-                              self.lat[self.validflag],
-                              self.lon[self.validflag],
-                              self.dem[self.validflag],
-                              self.surftype[:, self.validflag],
-                              self.year,
-                              self.month
-                              )
         if emis is not None :
             inemis = np.transpose(emis[:, row, col])
         else:
@@ -110,12 +80,63 @@ class CSimulateT799(object):
         else:
             inbrdf = None
 
-        self.myrttov = SimulateIR_clr(nchans, channelID, self.nprofs,
-                       self.NWP_LEVEL, myprof, self.month, FileCoef,
-                       inemis=inemis, inbrdf=inbrdf,
-                       emispath=emispath, brdfpath=brdfpath)
+        self.myrttov = SimulateIR(
+            nchans, channelID,
+            self.nprofs, self.NWP_LEVEL,
+            np.transpose(self.nwp_pre[:, row, col]),
+            np.transpose(self.nwp_t[:, row, col]),
+            np.transpose(self.nwp_q[:, row, col]),
+            self.nwp_t2m[row, col], self.nwp_q2m[row, col],
+            self.nwp_ts[row, col], self.nwp_sp[row, col],
+            self.nwp_u10m[row, col], self.nwp_v10m[row, col],
+            self.satz[self.validflag], self.sata[self.validflag],
+            self.sunz[self.validflag], self.suna[self.validflag],
+            self.lat[self.validflag], self.lon[self.validflag],
+            self.dem[self.validflag], self.surftype[:, self.validflag],
+            self.year, self.month,
+            coeffilename=FileCoef,
+            inemis=inemis, inbrdf=inbrdf,
+            emispath=emispath, brdfpath=brdfpath)
 
         return self.myrttov
+
+        # myprof = Initprofiles(self.nprofs, self.NWP_LEVEL,
+        #                       np.transpose(self.nwp_pre[:, row, col]),
+        #                       np.transpose(self.nwp_t[:, row, col]),
+        #                       np.transpose(self.nwp_q[:, row, col]),
+        #                       self.nwp_t2m[row, col],
+        #                       self.nwp_q2m[row, col],
+        #                       self.nwp_ts[row, col],
+        #                       self.nwp_sp[row, col],
+        #                       self.nwp_u10m[row, col],
+        #                       self.nwp_v10m[row, col],
+        #                       # self.fy4a_nom_p[self.validflag, :],
+        #                       # self.fy4a_nom_t[self.validflag, :],
+        #                       # self.fy4a_nom_q[self.validflag, :],
+        #                       # self.fy4a_nom_t2m[self.validflag],
+        #                       # self.fy4a_nom_q2m[self.validflag],
+        #                       # self.fy4a_nom_ts[self.validflag],
+        #                       # self.fy4a_nom_sp[self.validflag],
+        #                       # self.fy4a_nom_u10m[self.validflag],
+        #                       # self.fy4a_nom_v10m[self.validflag],
+        #                       self.satz[self.validflag],
+        #                       self.sata[self.validflag],
+        #                       self.sunz[self.validflag],
+        #                       self.suna[self.validflag],
+        #                       self.lat[self.validflag],
+        #                       self.lon[self.validflag],
+        #                       self.dem[self.validflag],
+        #                       self.surftype[:, self.validflag],
+        #                       self.year,
+        #                       self.month
+        #                       )
+
+
+        # self.myrttov = SimulateIR_clr(nchans, channelID, self.nprofs,
+        #                self.NWP_LEVEL, myprof, self.month, FileCoef,
+        #                inemis=inemis, inbrdf=inbrdf,
+        #                emispath=emispath, brdfpath=brdfpath)
+
 
     def GetBT(self):
         # np.save('btref.npy', self.myrttov.BtRefl)
@@ -310,8 +331,6 @@ class CSimulateT799(object):
         fEp = q * rh * 0.01
 
         return  (fEp / (presure - 0.378 * fEp)) * 0.622
-
-
 
 def run(nwptime, geoname, outname, albedoname=None):
     import time
